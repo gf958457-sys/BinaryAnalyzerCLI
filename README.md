@@ -6,7 +6,7 @@ Production-oriented .NET 10 console application for static disassembly and first
 
 ## ⚠️ Important, honest caveat about "Capstone 5"
 
-You asked for Capstone Engine **5**. The best-maintained managed .NET binding,
+Capstone Engine **5** - no. The best-maintained managed .NET binding,
 [`Gee.External.Capstone`](https://www.nuget.org/packages/Gee.External.Capstone)
 (v2.3.x, referenced in the `.csproj`), currently wraps the native **Capstone 4**
 library — there is no mainstream managed wrapper for Capstone 5 published on
