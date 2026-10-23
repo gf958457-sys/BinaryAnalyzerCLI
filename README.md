@@ -1,8 +1,8 @@
 <h1 align="center">🔬 BinaryAnalyzerCLI</h1>
 
 <p align="center">
-  <b>First-pass static triage for PE, ELF and raw binaries — right in your terminal.</b><br/>
-  Streaming disassembly · function discovery · string &amp; suspicious-API extraction · optional AI-assisted review
+  <b>Quick static smell-tests for PE, ELF, and bare binary blobs — straight from the terminal.</b><br/>
+  Chunked disassembly · function boundary recovery · strings &amp; suspicious Win32/libc calls · optional OpenRouter LLM triage
 </p>
 
 <p align="center">
@@ -15,12 +15,6 @@
   <img alt="Engines" src="https://img.shields.io/badge/engines-iced--x86%20%7C%20Capstone-0078D4?style=for-the-badge" />
   <img alt="Formats" src="https://img.shields.io/badge/formats-PE%20%7C%20ELF%20%7C%20Raw-8A2BE2?style=for-the-badge" />
   <img alt="Architectures" src="https://img.shields.io/badge/arch-x86%20%7C%20x64%20%7C%20ARM%20%7C%20ARM64-555?style=for-the-badge" />
-</p>
-
-<p align="center">
-  <img alt="Stars" src="https://img.shields.io/github/stars/gf958457-sys/BinaryAnalyzerCLI?style=flat-square&logo=github" />
-  <img alt="Last commit" src="https://img.shields.io/github/last-commit/gf958457-sys/BinaryAnalyzerCLI?style=flat-square" />
-  <img alt="Issues" src="https://img.shields.io/github/issues/gf958457-sys/BinaryAnalyzerCLI?style=flat-square" />
 </p>
 
 <p align="center">
@@ -37,13 +31,13 @@
 ---
 
 > [!WARNING]
-> **Early alpha.** Results are heuristic triage hints, not verdicts. Read the [DISCLAIMER](DISCLAIMER.md) before analysing untrusted samples or using the AI feature.
+> **Early alpha preview.** The scanner produces rough heuristic triage signals, not definitive verdicts. Check [DISCLAIMER.md](DISCLAIMER.md) before throwing live malware or sensitive payloads at this tool.
 
-## 🎯 What is it?
+## 🎯 What is this?
 
-**BinaryAnalyzerCLI** answers the question *"what am I looking at?"* in seconds. Point it at an executable and it identifies the format and architecture, streams a full disassembly, discovers functions, pulls out strings, flags API usage that is commonly abused by malware, and — if you want — lets you ask an LLM questions about the result.
+When you get handed an unknown binary blob, firing up Ghidra or IDA just to see what headers it has, whether it drops threads into remote processes, or what strings sit inside is overkill. **BinaryAnalyzerCLI** does that initial 30-second sanity check without leaving your shell. Feed it a file; it works out the file format, detects the ISA, sweeps through instructions in small memory-conscious chunks, carves candidate function boundaries, extracts ASCII/Unicode strings, and flags common API abuse patterns. If you need a second pair of eyes, you can query an LLM on the extracted context.
 
-It is an interactive console tool (a persistent REPL, like a debugger shell), written in modern C# on .NET 10.
+Architecture-wise, it runs as an interactive REPL shell built on .NET 10 (C# 13), keeping state between operations so you do not have to reload binaries between scans.
 
 ## ✨ Highlights
 
@@ -51,50 +45,50 @@ It is an interactive console tool (a persistent REPL, like a debugger shell), wr
 <tr>
 <td width="50%" valign="top">
 
-### 🧩 Two interchangeable engines
-**iced-x86** (pure managed, x86/x64) and **Capstone** (x86, ARM, ARM64). ARM/ARM64 automatically falls back to Capstone, and the engine that *actually* decoded the bytes is remembered for every later replay.
+### 🧩 Dual Disassembly Backends
+Uses **iced-x86** for fast managed x86/x64 decoding and hands ARM/ARM64 over to **Capstone** via native bindings. If you inspect an ARM binary, the engine switch happens silently behind the scenes, and the tool pins whichever engine decoded the bytes so replays stay bit-exact.
 
 </td>
 <td width="50%" valign="top">
 
-### 🌊 Streaming by design
-Disassembly runs in 256 KiB chunks with resync and a live progress bar. Instruction objects are transient — a function is re-decoded on demand when you open it, never kept in a giant list.
+### 🌊 Memory-Conscious Chunked Sweeps
+Instead of allocating millions of instruction objects upfront, disassembly processes in 256 KiB ring slices with auto-resync. Functions get re-decoded on the fly when you inspect them in the shell, keeping peak memory low on large binaries.
 
 </td>
 </tr>
 <tr>
 <td valign="top">
 
-### 🧭 Layered function discovery
-Entry point, direct `CALL` targets, prologue patterns, PE `.pdata` unwind records, tail-`JMP` targets and data-section function-pointer tables — merged, validated against executable regions and resolved into boundaries with a control-flow graph.
+### 🧭 Multi-Heuristic Function Recovery
+Combines PE `.pdata` exception unwinding records (authoritative for x64/ARM64), binary entry points, direct `CALL` targets, prologue signatures (`push rbp`, `stp x29, x30`), tail `JMP`s, and contiguous data-section pointer tables into a unified CFG boundary resolver.
 
 </td>
 <td valign="top">
 
-### 🚨 Suspicious-API triage
-35 signatures in 6 behaviour categories, matched against both the import table and embedded strings (to catch APIs resolved dynamically via `GetProcAddress`).
+### 🚨 API Triage &amp; Dynamic Import Matching
+Tracks 35 indicators across 6 abuse categories. It checks both the compiled IAT and embedded raw strings — meaning functions resolved dynamically at runtime through `GetProcAddress` or loaded via `LoadLibrary` still get caught.
 
 </td>
 </tr>
 <tr>
 <td valign="top">
 
-### 🤖 Optional AI Q&amp;A
-Ask free-form questions about the analysed binary through any model available on [OpenRouter](https://openrouter.ai). Fully optional and off the critical path.
+### 🤖 OpenRouter LLM Inspection (Optional)
+Pipe the triage report and head assembly into any model hosted on [OpenRouter](https://openrouter.ai). This is entirely optional and stays out of your way unless you run `ai analys`.
 
 </td>
 <td valign="top">
 
-### 📤 Clean exports
-Write the full listing to `ASM.txt` and a classic *offset | bytes | ASCII* dump to `hex.txt`, streamed straight to disk.
+### 📤 Flat-File Disassembly &amp; Hex Dumps
+Dump entire disassembled sections to `ASM.txt` or generate classic canonical hex dumps (`offset | hex | ascii`) to `hex.txt` without keeping full buffers in memory.
 
 </td>
 </tr>
 </table>
 
-## 🎬 Demo
+## 🎬 Terminal Walkthrough
 
-> Illustrative session — numbers and addresses are examples; the layout matches real output.
+> Example REPL run on a 64-bit Windows executable. Output format and addresses match actual runtime output.
 
 ```text
   ____  _                            _                _                     _____ _     ___
@@ -140,13 +134,13 @@ Select function number (or 'q' to cancel): 2
 
 ## 🚀 Quick start
 
-### Requirements
+### Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- Internet access on the first build (NuGet restore)
-- Native Capstone libraries are pulled in automatically by `Gee.External.Capstone` (Windows, Linux, macOS)
+- Working connection for NuGet packages during the first restore
+- Native Capstone binaries get pulled in by `Gee.External.Capstone` automatically across Linux, macOS, and Windows.
 
-### Build &amp; run
+### Building from source
 
 ```bash
 git clone https://github.com/gf958457-sys/BinaryAnalyzerCLI.git
@@ -156,13 +150,13 @@ dotnet build -c Release
 dotnet run -c Release
 ```
 
-You can also hand it a command on startup — it runs, then drops you into the prompt:
+To analyze a file right away without waiting for the welcome banner:
 
 ```bash
 dotnet run -c Release -- open path/to/sample.exe
 ```
 
-### Publish a standalone build
+### Standalone binary publish
 
 ```bash
 dotnet publish -c Release -o out
@@ -170,31 +164,31 @@ dotnet publish -c Release -o out
 out\BinaryAnalyzerCLI.exe      # Windows
 ```
 
-### Your first analysis
+### Typical run sequence
 
 ```text
 open <path>  →  analyze  →  functions  →  export asm  →  ai analys
 ```
 
-## ⌨️ Commands
+## ⌨️ Command reference
 
-| Command | What it does |
+| Command | Action |
 | --- | --- |
-| `open <path>` | Load a file; detect format, architecture, entry point, sections and imports |
-| `analyze` | Run disassembly, string extraction, API scan, function discovery and CFG build |
-| `functions` | List discovered functions, then pick one to view its disassembly |
-| `export asm` | Write the full listing to `ASM.txt` in the export directory |
-| `export hex` | Write an *offset \| bytes \| ASCII* dump to `hex.txt` (no prior `analyze` required) |
-| `ai analys` | Enter an interactive AI Q&A prompt about the last analysis (`back` to leave) |
-| `settings` | Interactive editor for engine, output format, export directory and AI options |
-| `help` | List all commands |
-| `exit` / `quit` | Leave the program |
+| `open <path>` | Ingests binary; parses headers, identifies ISA, reads sections &amp; import descriptors |
+| `analyze` | Triggers full pipeline: streaming decode, string harvest, API matching, CFG construction |
+| `functions` | Shows recovered routines with confidence scores; enter an index to dump its assembly |
+| `export asm` | Streams full decoded disassembly out to `ASM.txt` inside the export folder |
+| `export hex` | Dumps raw byte offsets and ASCII column to `hex.txt` (works standalone without running `analyze` first) |
+| `ai analys` | Drops into the interactive LLM prompt (type `back` when you want to return to REPL) |
+| `settings` | Configurator wizard for active disassembler, export paths, and AI flags |
+| `help` | Prints supported command list |
+| `exit` / `quit` | Terminates CLI session |
 
-Commands are case-insensitive. Multi-word commands are matched longest-first.
+*Note: Commands are case-insensitive. Multi-word commands match using longest-prefix rules.*
 
-## ⚙️ Configuration
+## ⚙️ Configuration files
 
-Two JSON files live next to the executable and are created with defaults on first run. Most values can be changed live with the `settings` command.
+On its first start, the tool drops two configuration files into the working directory. Most settings can be adjusted on the fly through the `settings` command.
 
 <details open>
 <summary><b>Settings.json</b></summary>
@@ -209,13 +203,13 @@ Two JSON files live next to the executable and are created with defaults on firs
 }
 ```
 
-| Key | Values | Notes |
+| Key | Options | Behavior |
 | --- | --- | --- |
-| `Disassembler` | `Iced`, `Capstone` | iced-x86 covers x86/x64 only; ARM/ARM64 always uses Capstone |
-| `Architecture` | `Auto`, `x86`, `x64`, `arm`, `arm64` | `Auto` uses the detected architecture. **Required for raw binaries** — set it here (not available in the `settings` menu) |
-| `ExportDirectory` | any path | Where `ASM.txt` and `hex.txt` are written |
-| `AIEnabled` | `true` / `false` | Master switch for `ai analys` |
-| `OutputFormat` | `Text` | |
+| `Disassembler` | `Iced`, `Capstone` | iced-x86 works for x86/x64 only. Capstone handles ARM and ARM64 |
+| `Architecture` | `Auto`, `x86`, `x64`, `arm`, `arm64` | `Auto` derives ISA from binary headers. **Mandatory override for raw firmware / shellcode blobs** (must be edited directly in JSON) |
+| `ExportDirectory` | arbitrary directory path | Target folder for generated `ASM.txt` and `hex.txt` files |
+| `AIEnabled` | `true` / `false` | Toggles the `ai analys` command branch |
+| `OutputFormat` | `Text` | Output formatting mode |
 
 </details>
 
@@ -234,11 +228,11 @@ Two JSON files live next to the executable and are created with defaults on firs
 ```
 
 > [!IMPORTANT]
-> Set your API key **before launching** the tool. The key is stored in plain text, so **never commit a real key**. After cloning, consider `git update-index --skip-worktree Ai.json` so local edits are never staged.
+> Paste your API token in `Ai.json` before firing up the interactive AI shell. Keys sit unencrypted on disk, so never commit this file back to version control. Running `git update-index --skip-worktree Ai.json` locally is strongly advised.
 
 </details>
 
-## 🔬 How it works
+## 🔬 Internal pipeline
 
 ```mermaid
 flowchart LR
@@ -261,24 +255,24 @@ flowchart LR
     O --> R[AI Q&A]
 ```
 
-### Function discovery sources
+### Function discovery confidence tiers
 
-Every candidate is recorded together with *how* it was found, and weaker evidence never downgrades a stronger source for the same address.
+The resolver tags candidate functions with their origin evidence. High-confidence sources always override weaker guesses when addresses collide.
 
-| Source | Evidence | Confidence |
+| Origin | Detection mechanism | Reliability |
 | --- | --- | --- |
-| `unwind` | PE `.pdata` `RUNTIME_FUNCTION` entries (x64 / ARM64) | Authoritative |
-| `entrypoint` | Binary entry point | Strongest available |
-| `directcalltarget` | Target of a direct `CALL` | Medium |
-| `prologue` | `push rbp` / `stp x29, x30` patterns | Weak |
-| `tailjmptarget` | Target of a direct unconditional `JMP` | Weakest |
-| `datapointertarget` | Entry in a data-section run of ≥ 2 consecutive code pointers | Weakest |
+| `unwind` | PE `.pdata` `RUNTIME_FUNCTION` table (x64 / ARM64) | Authoritative (compiler-generated) |
+| `entrypoint` | Primary executable entry point from file header | Ground-truth entry |
+| `directcalltarget` | Immediate target operand from direct `CALL` instruction | Medium |
+| `prologue` | Standard stack frame setup (`push rbp`, `stp x29, x30`) | Heuristic guess |
+| `tailjmptarget` | Direct unconditional `JMP` landing address | Low |
+| `datapointertarget` | Series of $\ge 2$ consecutive code addresses found in data sections | Weakest hint |
 
-The `Confirmations` column in `functions` shows how many independent sources agreed on a function start.
+The `Confirmations` tally in the function viewer indicates how many separate heuristics flagged that exact address.
 
-### 🚨 Suspicious-API categories
+### 🚨 Monitored API signatures
 
-| Category | Signatures | Examples |
+| Category | Rules | Common targets |
 | --- | :---: | --- |
 | `ProcessInjection` | 6 | `CreateRemoteThread`, `NtCreateThreadEx`, `QueueUserAPC` |
 | `MemoryAllocation` | 5 | `VirtualAlloc`, `VirtualProtectEx`, `NtMapViewOfSection` |
@@ -287,32 +281,32 @@ The `Confirmations` column in `functions` shows how many independent sources agr
 | `NetworkActivity` | 6 | `URLDownloadToFileA`, `InternetOpenUrlA`, `connect` |
 | `Persistence` | 5 | `RegSetValueExA/W`, `CreateServiceA` |
 
-Lowercase libc names such as `system` or `send` double as ordinary English words, so inside strings they only match in call or linkage form (`system(...)`, `libc!system`) — not as prose.
+To prevent spurious hits on common English words, short names like `system` or `send` only trigger matches if they appear in explicit invocation or export format (e.g. `system(...)` or `libc!system`), not as stray prose.
 
-## 🤖 AI-assisted review
+## 🤖 LLM-assisted triage
 
-`ai analys` opens a nested prompt. Each question is sent to the configured model together with a bounded context built from the last analysis.
+Running `ai analys` spins up a sub-shell that attaches parsed binary metadata to your query context.
 
 > [!CAUTION]
-> **Data leaves your machine.** The following is transmitted to OpenRouter and the underlying model provider:
+> **Data outbound notice.** When using this feature, the following payloads are submitted to OpenRouter and downstream model providers:
 >
-> - file name, format, architecture, size, entry point, image base, section names and imported library names
-> - every suspicious-API hit
-> - the **first 4,000 instructions** (address, raw bytes, text)
-> - the **first 200 extracted strings**
-> - your question
+> - File metadata: name, format, architecture, image size, entry point, section layout, and linked import table
+> - All identified suspicious API calls
+> - The **first 4,000 instructions** (virtual address, raw bytes, mnemonic text)
+> - The **first 200 extracted strings**
+> - Your typed prompt
 >
-> Do not use this feature with confidential, proprietary, or NDA-protected binaries. AI answers can be wrong or invented — always verify against the disassembly. See the [DISCLAIMER](DISCLAIMER.md).
+> Do not point this at proprietary binaries, embargoed vulnerability drops, or files under non-disclosure agreements. Model responses can hallucinate control flow — treat them as hints and verify against raw disassembly. See [DISCLAIMER.md](DISCLAIMER.md).
 
-Switch models any time by editing `Model` in `Ai.json` (or `settings` → option 5). No code changes needed.
+Models can be swapped on the fly by changing the `Model` property in `Ai.json` (or via `settings` option 5).
 
-## 📤 Export formats
+## 📤 Output dumps
 
 <table>
 <tr>
 <td valign="top">
 
-**`ASM.txt`**
+**`ASM.txt` sample**
 
 ```text
 ; BinaryAnalyzerCLI disassembly export
@@ -332,7 +326,7 @@ mov rbp,rsp
 </td>
 <td valign="top">
 
-**`hex.txt`**
+**`hex.txt` sample**
 
 ```text
 OFFSET    | BYTES                                           | ASCII
@@ -344,19 +338,19 @@ OFFSET    | BYTES                                           | ASCII
 </tr>
 </table>
 
-## 🗺️ Support matrix
+## 🗺️ Compatibility matrix
 
-| | Support |
+| Subsystem | Coverage |
 | --- | --- |
-| **Formats** | PE32 / PE32+ (headers, sections, import table, `.pdata`) · ELF32 / ELF64 (header and sections) · Raw |
-| **Architectures** | x86 · x64 · ARM · ARM64 |
-| **Engines** | iced-x86 `1.21.0` · Capstone via `Gee.External.Capstone` `2.3.0` (native Capstone **4.0**) |
-| **Operating systems** | Windows · Linux · macOS — Capstone natives for each ship via NuGet `runtimes/`. Developed and tested primarily on Windows; other platforms are not yet covered by CI |
+| **Formats** | PE32 / PE32+ (headers, sections, import table, `.pdata`) · ELF32 / ELF64 (headers and section headers) · Raw flat memory dumps |
+| **ISAs** | x86 · x64 · ARM · ARM64 |
+| **Engines** | iced-x86 (`1.21.0`) · Capstone via `Gee.External.Capstone` (`2.3.0` linking against native Capstone **4.0**) |
+| **Platforms** | Windows, Linux, and macOS. Native Capstone libraries ship embedded in NuGet packages. Main dev work happens on Windows; cross-platform CI matrix is currently in progress. |
 
-## 🧱 Architecture
+## 🧱 Architectural design
 
 <details>
-<summary><b>Project layout</b></summary>
+<summary><b>Source tree layout</b></summary>
 
 ```text
 BinaryAnalyzerCLI/
@@ -380,64 +374,64 @@ BinaryAnalyzerCLI/
 
 </details>
 
-**Design notes**
+**Implementation decisions**
 
-- **Dependency injection throughout** — parsers, engines, exporters, commands and the AI provider are all resolved from `Microsoft.Extensions.DependencyInjection`.
-- **Normalized semantics** — both engines map their output to a single `InstructionSemantics` value type (flow control, operands, access, category). Everything downstream consumes semantics, never engine-specific types or mnemonic text.
-- **Fail loudly, not partially** — if the native Capstone library is missing, `analyze` aborts with an actionable message instead of producing a half-result. A bad command never kills the session.
+- **Dependency Injection**: Disassembly engines, parsers, exporters, and AI clients are resolved through standard `Microsoft.Extensions.DependencyInjection`.
+- **Semantic Normalization**: Both Capstone and iced-x86 translate instructions into a unified `InstructionSemantics` struct (control flow, memory access, operands). Analysis code works entirely on semantics and never depends on engine-specific mnemonics.
+- **Fail-Fast Error Handling**: If Capstone native libraries fail to load (e.g. missing dependencies), the CLI surfaces a targeted error rather than producing silent partial disassemblies.
 
-### Extending
+### Adding new components
 
-| I want to add… | Do this |
+| Extension task | Steps required |
 | --- | --- |
-| a disassembler engine | implement `IDisassemblerEngine`, register it in `Program.cs`, add a branch in `DisassemblerEngineFactory` |
-| an AI provider | implement `IAIProvider` and swap the `AddHttpClient<IAIProvider, …>()` registration |
-| an export format | implement `IExporter`, register it, add a command modelled on `ExportAsmCommand` |
-| a container format (e.g. Mach-O) | implement `IBinaryParser` and register it next to `PeAnalyzer` / `ElfAnalyzer` |
-| a new command | implement `ICommand` and call `RegisterCommand<T>()` in `Program.cs` |
+| New disassembler backend | Implement `IDisassemblerEngine`, bind it in `Program.cs`, add factory dispatch branch in `DisassemblerEngineFactory` |
+| Additional LLM provider | Implement `IAIProvider` and update the typed HTTP client registration |
+| Custom export format | Implement `IExporter` and create a command patterned after `ExportAsmCommand` |
+| New container format (e.g. Mach-O) | Implement `IBinaryParser` and register it alongside `PeAnalyzer` / `ElfAnalyzer` |
+| New REPL verb | Implement `ICommand` and register it with `RegisterCommand<T>()` in `Program.cs` |
 
-## 🧪 Testing
+## 🧪 Running tests
 
 ```bash
 dotnet test Tests/BinaryAnalyzerCLI.Tests.csproj -c Release
 ```
 
-The xUnit suite covers PE/ELF parsing, streaming and resync, cross-engine semantic parity (iced-x86 vs Capstone), function discovery and boundary resolution, CFG construction, suspicious-API matching and native-library failure handling.
+The xUnit test suite covers PE and ELF parsing, ring-buffer streaming resync, semantic parity between Iced and Capstone on identical x86/x64 bytes, CFG edge creation, API signature triggers, and fallback handling when native libraries are missing.
 
-## 🚩 Limitations
+## 🚩 Known limitations &amp; caveats
 
-This is an **early alpha**. Know what it does *not* do:
+Keep in mind this is an **early alpha release**:
 
-- **Heuristic by nature.** Function boundaries, API hits and the AI's conclusions are triage hints. Expect false positives and false negatives.
-- **Static only.** Nothing is executed, and there is no unpacking or deobfuscation — packed or encrypted binaries will give poor results.
-- **Capstone 4.0.** The bundled native library is Capstone 4.0; Capstone 5 features are not available.
-- **ELF depth.** Only the header and section table are parsed — no symbols or imports, so API triage on ELF relies on embedded strings.
-- **No Mach-O**, no decompiler, no GUI.
-- **Raw binaries** need an explicit `Architecture` in `Settings.json`; with `Auto` and an unknown architecture, disassembly is skipped.
-- **Memory.** The input file is read fully into memory, so very large images need matching RAM.
-- **Command naming.** The AI command is spelled `ai analys` (sic).
+- **Heuristic outputs**: Boundary resolution, CFG construction, and API flags are triage suggestions, not decompilation proof.
+- **Purely static**: No dynamic emulation, unpacking, or deobfuscation. Heavily packed or crypted binaries won't yield meaningful code listings.
+- **Capstone version**: Uses native Capstone 4.0 bindings; Capstone 5 instruction extensions are not available.
+- **ELF symbol depth**: Parses headers and section entries only; ELF does not parse full dynamic symbols yet, so API checks on ELF rely on string matches.
+- **Out of scope**: No Mach-O parser, no decompiler, no GUI.
+- **Raw firmware blobs**: Requires setting `Architecture` manually in `Settings.json`. If left on `Auto`, disassembly skips raw files.
+- **Memory footprint**: The target binary gets mapped into process memory; extremely large samples (e.g. multi-gigabyte ISOs) will consume proportional RAM.
+- **Command spelling**: The command is deliberately named `ai analys` (single s).
 
 ## 🤝 Contributing
 
-Issues and pull requests are welcome. For bugs, please include the file format and architecture, the engine in use, and the exact command sequence. Please **do not attach malware samples or proprietary binaries** to issues — describe them or use a synthetic fixture instead.
+PRs and issue reports are welcome. When filing a bug, please include sample architecture, file format, the active engine, and the exact command order that triggered the failure. **Never attach live malware or proprietary samples to GitHub issues** — write a synthetic test case or describe the byte sequence instead.
 
-## ⚖️ Legal
+## ⚖️ Legal &amp; License
 
-- Licensed under the **[MIT License](LICENSE)**.
-- Please read the **[DISCLAIMER](DISCLAIMER.md)** — it covers intended use, safe handling of samples, AI data transfer and legal responsibility.
+- Distributed under the **[MIT License](LICENSE)**.
+- Review [DISCLAIMER.md](DISCLAIMER.md) regarding safe analysis of unknown software, cloud data transmission, and legal usage boundaries.
 
-## 🙏 Built with
+## 🙏 Dependencies &amp; Credits
 
-| Component | Role |
+| Library | Function |
 | --- | --- |
-| [iced-x86](https://github.com/icedland/iced) | managed x86/x64 disassembler |
-| [Capstone](https://www.capstone-engine.org) | multi-architecture disassembly framework |
-| [Gee.External.Capstone](https://github.com/9ee1/Capstone.NET) | .NET binding for Capstone |
-| [Microsoft.Extensions.*](https://github.com/dotnet/runtime) | DI, logging, hosting, HTTP |
-| [OpenRouter](https://openrouter.ai) | optional unified LLM gateway |
+| [iced-x86](https://github.com/icedland/iced) | High-performance managed x86/x64 disassembler |
+| [Capstone](https://www.capstone-engine.org) | Multi-architecture disassembly engine |
+| [Gee.External.Capstone](https://github.com/9ee1/Capstone.NET) | .NET P/Invoke bridge for Capstone |
+| [Microsoft.Extensions.*](https://github.com/dotnet/runtime) | DI, hosting, HTTP client abstractions |
+| [OpenRouter](https://openrouter.ai) | Multi-model LLM API routing |
 
 <p align="center">
-  <sub>If this tool saves you time, a ⭐ helps others find it.</sub>
+  <sub>If this saves you time in triage, drop a ⭐ on the repository.</sub>
 </p>
 
 <div align="right">
